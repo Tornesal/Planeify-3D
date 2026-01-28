@@ -70,5 +70,5 @@ inline std::string_view trim(std::string_view s) {
   return s;
 }
 
-} // namespace ir
+}
 

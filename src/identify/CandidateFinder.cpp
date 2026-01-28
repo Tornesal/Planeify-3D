@@ -39,7 +39,7 @@ struct LayerKey {
   bool operator==(const LayerKey& o) const { return layer == o.layer; }
 };
 
-} // namespace
+}
 
 namespace identify {
 
