@@ -6,14 +6,43 @@ namespace planeify {
         
         GCodeFile file;
         std::string line;
+        GCodeCommand cmd;
 
         // Assume it is a header line until Z changes.
         bool is_header = true;
+        double z_height = 0.0;
 
         // TODO: Implement parsing loop
         while (std::getline(input, line)) { 
             
-            
+            cmd = parseLine(line);
+
+            // We treat ANY z movement as a new layer. The identifier will deal with determining if it is a REAL new layer or a z-hop.
+            if (cmd.type == CommandType::MOVE && cmd.params.count('Z') != 0) {
+
+                double newZ = cmd.params['Z'];
+
+                // basically if the z height changes at all, it is a new layer AND it is no longer a header.
+                if (newZ != z_height) {
+
+                    is_header = false;
+                    z_height = newZ;
+                    
+                    file.layers.emplace_back();
+                    file.layers.back().z_height = z_height;
+
+                }
+            }
+
+            // If it is part of the header, push it to the end of the vector.
+            if (is_header) {
+                file.header.push_back(cmd);
+
+            // Else, we fetch the layer we made in the z if logic above and add the commands to the correct place.
+            } else {
+                file.layers.back().commands.push_back(cmd);
+
+            }
 
         }
         return file;
@@ -30,11 +59,13 @@ namespace planeify {
 
         if (commentPos != std::string::npos) {
 
-            // Get the text BEFORE the commnet (;)
+            // Get the text BEFORE the comment (;)
             cleanLine = line.substr(0, commentPos);
 
             // If the whole line starts with ;, set type to COMMENT
-            if (commentPos == 0) cmd.type = CommandType::COMMENT;
+            if (commentPos == 0) {
+                cmd.type = CommandType::COMMENT;
+            }
 
         }
         
@@ -44,8 +75,31 @@ namespace planeify {
         
         while (ss >> token) {
             // token will be "G1", "X10", "Y20.5"
-            // You can inspect token[0] to see if it's 'X', 'Y', 'G', etc.
+            // Token command (EX: G, M, etc...) and value
+            try {
+
+                if (token.length() > 1) {
+                    cmd.params[token[0]] = std::stod(token.substr(1));
+
+                }
+
+            } catch (...) {
+                // Ignore if it's not a number (e.g. just "G")
+            }
+
+
+            // Assign command
+            if (token[0] == 'G'){
+                cmd.type = CommandType::MOVE;
+
+            } else if (token[0] == 'T') {
+                cmd.type = CommandType::TOOL_CHANGE;
+                
+            } else if (token[0] == 'M') {
+                cmd.type = CommandType::OTHER;
+            }
         }
+
         return cmd;
     }
 }
