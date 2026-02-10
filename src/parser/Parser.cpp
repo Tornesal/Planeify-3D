@@ -2,104 +2,108 @@
 
 namespace planeify {
 
-    GCodeFile Parser::parse(std::istream& input) {
-        
-        GCodeFile file;
-        std::string line;
-        GCodeCommand cmd;
+GCodeFile Parser::parse(std::istream &input) {
 
-        // Assume it is a header line until Z changes.
-        bool is_header = true;
-        double z_height = 0.0;
+  GCodeFile file;
+  std::string line;
+  GCodeCommand cmd;
 
-        // TODO: Implement parsing loop
-        while (std::getline(input, line)) { 
-            
-            cmd = parseLine(line);
+  // Assume it is a header line until Z changes.
+  bool is_header = true;
+  double z_height = 0.0;
+  double last_z_height = -1;
 
-            // We treat ANY z movement as a new layer. The identifier will deal with determining if it is a REAL new layer or a z-hop.
-            if (cmd.type == CommandType::MOVE && cmd.params.count('Z') != 0) {
+  // TODO: Implement parsing loop
+  while (std::getline(input, line)) {
 
-                double newZ = cmd.params['Z'];
+    cmd = parseLine(line);
 
-                // basically if the z height changes at all, it is a new layer AND it is no longer a header.
-                if (newZ != z_height) {
+    // If the z height changes, store it in the z_height
+    if (cmd.type == CommandType::MOVE && cmd.params.count('Z') != 0) {
 
-                    is_header = false;
-                    z_height = newZ;
-                    
-                    file.layers.emplace_back();
-                    file.layers.back().z_height = z_height;
-
-                }
-            }
-
-            // If it is part of the header, push it to the end of the vector.
-            if (is_header) {
-                file.header.push_back(cmd);
-
-            // Else, we fetch the layer we made in the z if logic above and add the commands to the correct place.
-            } else {
-                file.layers.back().commands.push_back(cmd);
-
-            }
-
-        }
-        return file;
+      z_height = cmd.params['Z'];
     }
 
-    GCodeCommand Parser::parseLine(const std::string& line) {
-        
-        GCodeCommand cmd;
-        cmd.original_text = line;
+    // Checking for start of a new layer by seeing if there is positive
+    // extrusion at a new z height
+    if (cmd.type == CommandType::MOVE && cmd.params.count('E') > 0 &&
+        cmd.params['E'] > 0) {
 
-        // 1. Handle Comments first (strip anything after ;)
-        std::string cleanLine = line;
-        size_t commentPos = line.find(';');
+      double newE = cmd.params['E'];
 
-        if (commentPos != std::string::npos) {
+      if (z_height != last_z_height) {
 
-            // Get the text BEFORE the comment (;)
-            cleanLine = line.substr(0, commentPos);
+        is_header = false;
 
-            // If the whole line starts with ;, set type to COMMENT
-            if (commentPos == 0) {
-                cmd.type = CommandType::COMMENT;
-            }
+        last_z_height = z_height;
 
-        }
-        
-        // 2. Tokenize the clean part
-        std::stringstream ss(cleanLine);
-        std::string token;
-        
-        while (ss >> token) {
-            // token will be "G1", "X10", "Y20.5"
-            // Token command (EX: G, M, etc...) and value
-            try {
-
-                if (token.length() > 1) {
-                    cmd.params[token[0]] = std::stod(token.substr(1));
-
-                }
-
-            } catch (...) {
-                // Ignore if it's not a number (e.g. just "G")
-            }
-
-
-            // Assign command
-            if (token[0] == 'G'){
-                cmd.type = CommandType::MOVE;
-
-            } else if (token[0] == 'T') {
-                cmd.type = CommandType::TOOL_CHANGE;
-                
-            } else if (token[0] == 'M') {
-                cmd.type = CommandType::OTHER;
-            }
-        }
-
-        return cmd;
+        file.layers.emplace_back();
+        file.layers.back().z_height = z_height;
+      }
     }
+
+    // If it is part of the header, push it to the end of the vector.
+    if (is_header) {
+      file.header.push_back(cmd);
+
+      // Else, we fetch the layer we made in the z if logic above and add the
+      // commands to the correct place.
+    } else {
+      file.layers.back().commands.push_back(cmd);
+    }
+  }
+  return file;
 }
+
+GCodeCommand Parser::parseLine(const std::string &line) {
+
+  GCodeCommand cmd;
+  cmd.original_text = line;
+
+  // 1. Handle Comments first (strip anything after ;)
+  std::string cleanLine = line;
+  size_t commentPos = line.find(';');
+
+  if (commentPos != std::string::npos) {
+
+    // Get the text BEFORE the comment (;)
+    cleanLine = line.substr(0, commentPos);
+
+    // If the whole line starts with ;, set type to COMMENT
+    if (commentPos == 0) {
+      cmd.type = CommandType::COMMENT;
+    }
+  }
+
+  // 2. Tokenize the clean part
+  std::stringstream ss(cleanLine);
+  std::string token;
+
+  while (ss >> token) {
+    // token will be "G1", "X10", "Y20.5"
+    // Token command (EX: G, M, etc...) and value
+    try {
+
+      if (token.length() > 1) {
+        cmd.params[token[0]] = std::stod(token.substr(1));
+      }
+
+    } catch (...) {
+      // Ignore if it's not a number (e.g. just "G")
+    }
+
+    // Assign command
+    if (token[0] == 'G') {
+      cmd.type = CommandType::MOVE;
+
+    } else if (token[0] == 'T') {
+      cmd.type = CommandType::TOOL_CHANGE;
+
+    } else if (token[0] == 'M') {
+      cmd.type = CommandType::OTHER;
+    }
+  }
+
+  return cmd;
+}
+} // namespace planeify
