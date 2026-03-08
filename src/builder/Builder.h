@@ -7,11 +7,11 @@
 namespace planeify {
 
     class Builder {
-    public:
+        public:
         // TODO: Implement build method
         // void build(const GCodeFile& file, std::ostream& output);
     };
 
-}
+} // namespace planeify
 
-#endif //PLANEIFY_3D_BUILDER_H
+#endif // PLANEIFY_3D_BUILDER_H
