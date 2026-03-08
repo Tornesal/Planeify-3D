@@ -22,7 +22,14 @@ int main(int argc, char *argv[]) {
 
   // Future steps:
   // 3. Identifier::identify()
-  // 4. Translator::translate()
+  
+  planeify::TranslatorConfig config;
+  config.grid_resolution = 0.1;
+  config.max_clearance_angle = 15.0; 
+
+  planeify::Translator translator;
+  translator.translate(ir, config);
+
   // 5. Builder::build()
 
   return 0;
