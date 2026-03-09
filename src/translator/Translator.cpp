@@ -3,24 +3,20 @@
 #include <unordered_map>
 #include <cmath>
 #include <utility>
+#include <limits>
+
 
 namespace planeify {
-
-    // Helper syntax for using std::pair as a key in std::unordered_map
-    // Allows the keys to be a pair of coordinates (x, y)
-    struct PairHash {
-        template <class T1, class T2>
-        std::size_t operator () (const std::pair<T1, T2>& p) const {
-            auto h1 = std::hash<T1>{}(p.first);
-            auto h2 = std::hash<T2>{}(p.second);
-            // Simple hash combining
-            return h1 ^ (h2 << 1); 
-        }
-    };
 
     void Translator::translate(GCodeFile &ir, const TranslatorConfig &config) {
         
         std::cout << "Starting translation..." << std::endl;
+
+        // Min and Max X and Y values for determining the bounding box
+        int minX = std::numeric_limits<int>::max();
+        int maxX = std::numeric_limits<int>::min();
+        int minY = std::numeric_limits<int>::max();
+        int maxY = std::numeric_limits<int>::min();
 
         // Phase 1: Build the Heightmap
         std::unordered_map<std::pair<int, int>, double, PairHash> heightmap;
@@ -74,6 +70,12 @@ namespace planeify {
                         int gX = static_cast<int>(std::floor(interpX / config.grid_resolution));
                         int gY = static_cast<int>(std::floor(interpY / config.grid_resolution));
 
+                        // Update bounding box ranges
+                        if (gX < minX) minX = gX;
+                        if (gX > maxX) maxX = gX;
+                        if (gY < minY) minY = gY;
+                        if (gY > maxY) maxY = gY;
+
                         // If the current nozzle height (curZ) is heigher than what we currently have in
                         // that pixel, replace it.
                         double& mapZ = heightmap[std::make_pair(gX, gY)];
@@ -90,12 +92,45 @@ namespace planeify {
 
         }
 
+        const double PI = std::acos(-1.0);
+
         // Phase 2: Smooth the Heightmap
 
+        // Convert degrees to radians for C++ tan()
+        double rad = config.max_clearance_angle * PI / 180.0;
+
+        // The maximum Z we can drop over 1 pixel distance
+        double drop_straight = std::tan(rad) * config.grid_resolution;
+
+        // The maximum Z we can drop over 1 pixel diagonally
+        double drop_diagonal = std::tan(rad) * (config.grid_resolution * 1.41421);
+
+
+
         // Phase 3: Morph the IR
+        
+        // TODO Remove testing cout when finished
         std::cout << "Heightmap built with " << heightmap.size() << " pixels." << std::endl;
 
         std::cout << "Translation complete." << std::endl;
     }
+    
+
+    void applyHeightSmoothing(std::unordered_map<std::pair<int, int>, double, PairHash>& heightmap, const TranslatorConfig& config, int minX, int maxX, int minY, int maxY) {
+    // 1. Math constants (PI, rad, drop_straight, drop_diagonal)
+    
+    // 2. Forward Sweep
+    for (int x = minX; x <= maxX; ++x) {
+        for (int y = minY; y <= maxY; ++y) {
+            // Get curZ from map
+            // If curZ exists (is > 0):
+            //   - Check neighbor (x+1, y)
+            //   - Check neighbor (x, y+1)
+            //   - Check neighbor (x+1, y+1)
+        }
+    }
+    // 3. Backward Sweep
+    // (Exactly the same but count x from maxX to minX and y from maxY to minY)
+}
 
 } // namespace planeify

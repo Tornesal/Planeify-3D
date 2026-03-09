@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(Planeify3D
   src/main.cpp
   src/parser/Parser.cpp
+  src/translator/Translator.cpp
 )
 
 target_include_directories(Planeify3D PRIVATE src)
