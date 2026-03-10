@@ -273,6 +273,10 @@ namespace planeify {
 
                             // Warp the command
                             cmd.params['Z'] = curZ + delta_Z;
+
+                            // We mark the command as modified if we warped it.
+                            // This is used for the builder
+                            cmd.is_modified = true;
                         }
                     }
                 }
