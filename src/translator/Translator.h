@@ -43,6 +43,9 @@ namespace planeify {
 
         private:
         void applyHeightSmoothing(std::unordered_map<std::pair<int, int>, double, PairHash>& heightmap, const TranslatorConfig& config, int minX, int maxX, int minY, int maxY);
+
+        void applyIRMorphing(GCodeFile& ir, const std::unordered_map<std::pair<int, int>, double, PairHash>& heightmap, 
+                             const std::unordered_map<std::pair<int, int>, double, PairHash>& original_map, const TranslatorConfig& config);
     };
 
 } // namespace planeify

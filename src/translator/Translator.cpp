@@ -92,6 +92,8 @@ namespace planeify {
 
         }
 
+        std::unordered_map<std::pair<int, int>, double, PairHash> original_heightmap = heightmap;
+
         // TODO: Remove debug stuff
         // Debug: zheights before smoothing
         double raw_sum = 0;
@@ -202,6 +204,76 @@ namespace planeify {
                     if (my_Z - heightmap[key_diagonal] > drop_diagonal) {
 
                         heightmap[key_diagonal] = my_Z - drop_diagonal;
+                    }
+                }
+            }
+        }
+    }
+
+    void Translator::applyIRMorphing(GCodeFile& ir, const std::unordered_map<std::pair<int, int>, double, PairHash>& heightmap, 
+                             const std::unordered_map<std::pair<int, int>, double, PairHash>& original_map, const TranslatorConfig& config) {
+
+        // Track the absolute nozzle position
+        double curX = 0;
+        double curY = 0;
+        double curZ = 0;
+
+        // Basically the same logic as phase 1 BUT instead we are modifying the heightmap.
+        for (Layer& layer : ir.layers) {
+            for (GCodeCommand& cmd : layer.commands) {
+                
+                double oldX = curX;
+                double oldY = curY;
+
+                if (cmd.params.count('X')) {
+                    curX = cmd.params.at('X');
+                }
+
+                if (cmd.params.count('Y')) {
+                    curY = cmd.params.at('Y');
+                }
+
+                if (cmd.params.count('Z')) {
+                    curZ = cmd.params.at('Z');
+                }
+
+                double distX = (curX - oldX);
+                double distY = (curY - oldY);
+                double dist = std::sqrt(distX * distX + distY * distY);
+                double step_size = config.grid_resolution / 2.0;
+
+                if (cmd.type == CommandType::MOVE && cmd.params.count('E')) {
+                    
+                    for (double s = 0; s <= dist; s += step_size) {
+
+                        double distX = (curX - oldX);
+                        double distY = (curY - oldY);
+                        double dist = std::sqrt(distX * distX + distY * distY);
+                        double step_size = config.grid_resolution / 2.0;
+
+                        double t = (dist == 0) ? 1.0 : s/ dist;
+
+                        // Gather the current interpolated X and Y values
+                        double interpX = oldX + t * distX;
+                        double interpY = oldY + t * distY;
+
+                        // Gather the final "address" of the "pixel"
+                        int gX = static_cast<int>(std::floor(interpX / config.grid_resolution));
+                        int gY = static_cast<int>(std::floor(interpY / config.grid_resolution));
+
+                        auto key = std::make_pair(gX, gY);
+
+                        // Only apply warping IF there is actualy extrusion
+                        if (heightmap.count(key) && original_map.count(key)) {
+
+                            // Calculate the Delta (The thickness of the ramp added)
+                            double smoothed_Z = heightmap.at(key);
+                            double original_Z = original_map.at(key);
+                            double delta_Z = smoothed_Z - original_Z;
+
+                            // Warp the command
+                            cmd.params['Z'] = curZ + delta_Z;
+                        }
                     }
                 }
             }
