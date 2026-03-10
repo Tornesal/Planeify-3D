@@ -92,22 +92,22 @@ namespace planeify {
 
         }
 
-        const double PI = std::acos(-1.0);
+        // TODO: Remove debug stuff
+        // Debug: zheights before smoothing
+        double raw_sum = 0;
+        for (const auto& pair : heightmap) raw_sum += pair.second;
+        std::cout << "Sum of Z heights before smoothing: " << raw_sum << std::endl;
 
         // Phase 2: Smooth the Heightmap
+        applyHeightSmoothing(heightmap, config, minX, maxX, minY, maxY);
 
-        // Convert degrees to radians for C++ tan()
-        double rad = config.max_clearance_angle * PI / 180.0;
-
-        // The maximum Z we can drop over 1 pixel distance
-        double drop_straight = std::tan(rad) * config.grid_resolution;
-
-        // The maximum Z we can drop over 1 pixel diagonally
-        double drop_diagonal = std::tan(rad) * (config.grid_resolution * 1.41421);
-
-
-
+        // Debug: zheights after smoothing
+        double smooth_sum = 0;
+        for (const auto& pair : heightmap) smooth_sum += pair.second;
+        std::cout << "Sum of Z heights AFTER smoothing: " << smooth_sum << std::endl;
+       
         // Phase 3: Morph the IR
+        
         
         // TODO Remove testing cout when finished
         std::cout << "Heightmap built with " << heightmap.size() << " pixels." << std::endl;
@@ -116,21 +116,96 @@ namespace planeify {
     }
     
 
-    void applyHeightSmoothing(std::unordered_map<std::pair<int, int>, double, PairHash>& heightmap, const TranslatorConfig& config, int minX, int maxX, int minY, int maxY) {
-    // 1. Math constants (PI, rad, drop_straight, drop_diagonal)
+    // Throwback to trig
+    void Translator::applyHeightSmoothing(std::unordered_map<std::pair<int, int>, double, PairHash>& heightmap, const TranslatorConfig& config, int minX, int maxX, int minY, int maxY) {
     
-    // 2. Forward Sweep
-    for (int x = minX; x <= maxX; ++x) {
-        for (int y = minY; y <= maxY; ++y) {
-            // Get curZ from map
-            // If curZ exists (is > 0):
-            //   - Check neighbor (x+1, y)
-            //   - Check neighbor (x, y+1)
-            //   - Check neighbor (x+1, y+1)
+        const double PI = std::acos(-1.0);
+
+         // Convert degrees to radians for C++ tan()
+        double rad = config.max_clearance_angle * PI / 180.0;
+
+        // The maximum Z we can drop over 1 pixel distance
+        double drop_straight = std::tan(rad) * config.grid_resolution;
+
+        // The maximum Z we can drop over 1 pixel diagonally
+        // The 1.41421 is derived from pythagorean theorem (Approximation of sqrt(2))
+        double drop_diagonal = std::tan(rad) * (config.grid_resolution * 1.41421);
+    
+        // 2. Forward Sweep
+        for (int x = minX; x <= maxX; ++x) {
+            for (int y = minY; y <= maxY; ++y) {
+
+                auto key = std::make_pair(x, y);
+
+                // Get curZ from map
+                if (heightmap.count(key) > 0) {
+                    double my_Z = heightmap[key];
+                
+                
+                    // 1. Check Right Neighbor (x + 1, y)
+                    auto key_right = std::make_pair(x + 1, y);
+
+                    if (my_Z - heightmap[key_right] > drop_straight) {
+
+                        heightmap[key_right] = my_Z - drop_straight;
+                    }
+
+                    // Check lower neighbor (x, y + 1)
+                    auto key_below = std::make_pair(x, y + 1);
+
+                    if (my_Z - heightmap[key_below] > drop_straight) {
+
+                        heightmap[key_below] = my_Z - drop_straight;
+                    }
+
+                    // Check diagonal neighbor (x + 1, y + 1)
+                    auto key_diagonal = std::make_pair(x + 1, y + 1);
+
+                    if (my_Z - heightmap[key_diagonal] > drop_diagonal) {
+
+                        heightmap[key_diagonal] = my_Z - drop_diagonal;
+                    }
+                }
+            }
+        }
+
+        // 3. Backward Sweep
+        for (int x = maxX; x >= minX; --x) {
+            for (int y = maxY; y >= minY; --y) {
+
+                auto key = std::make_pair(x, y);
+
+                // Get curZ from map
+                if (heightmap.count(key) > 0) {
+                    double my_Z = heightmap[key];
+                
+                
+                    // 1. Check Right Neighbor (x - 1, y)
+                    auto key_right = std::make_pair(x - 1, y);
+
+                    if (my_Z - heightmap[key_right] > drop_straight) {
+
+                        heightmap[key_right] = my_Z - drop_straight;
+                    }
+
+                    // Check lower neighbor (x, y+1)
+                    auto key_below = std::make_pair(x, y - 1);
+
+                    if (my_Z - heightmap[key_below] > drop_straight) {
+
+                        heightmap[key_below] = my_Z - drop_straight;
+                    }
+
+                    // Check diagonal neighbor (x - 1, y - 1)
+                    auto key_diagonal = std::make_pair(x - 1, y - 1);
+
+                    if (my_Z - heightmap[key_diagonal] > drop_diagonal) {
+
+                        heightmap[key_diagonal] = my_Z - drop_diagonal;
+                    }
+                }
+            }
         }
     }
-    // 3. Backward Sweep
-    // (Exactly the same but count x from maxX to minX and y from maxY to minY)
-}
 
 } // namespace planeify

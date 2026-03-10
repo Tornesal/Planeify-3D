@@ -14,7 +14,7 @@
 // containing the highest z value for ALL x, y coordinates.
 
 // Once this map is created, the layers that the nozzle can successfully perform
-// non planar movements on (without colloding with other geometry) now have a
+// non planar movements on (without colliding with other geometry) now have a
 // warp applied to them to achieve non planar printing.
 
 namespace planeify {
